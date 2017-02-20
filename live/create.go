@@ -9,11 +9,24 @@ import (
 	"strconv"
 	"strings"
 
-	conf "github.com/ivancduran/edgecast/conf"
-	utils "github.com/ivancduran/edgecast/utils"
+	"github.com/ivancduran/edgecast/conf"
+	"github.com/ivancduran/edgecast/settings"
+	"github.com/ivancduran/edgecast/utils"
 )
 
-type Stream struct {
+type Stream interface {
+	Create() int
+	GetStream(s int) *Response
+}
+
+type Hls struct {
+	EventName        string
+	Expiration       string
+	InstanceName     string
+	KeyFrameInterval int
+}
+
+type Smooth struct {
 	EventName        string
 	Expiration       string
 	InstanceName     string
@@ -43,24 +56,30 @@ type resCreate struct {
 	Id int `json="Id"`
 }
 
-type resGkey struct {
-	Id string `json="Id"`
-}
-
 func New(s string) Stream {
 	fmt.Println(s)
-	// recibe hls, next is smooth
-	m := Stream{
+
+	m := Hls{
 		utils.Rands(15),
 		"2100-01-01",
 		"default",
 		5,
 	}
 
+	// if s == "smooth" {
+	// 	m := Smooth{
+	// 		utils.Rands(15),
+	// 		"2100-01-01",
+	// 		"default",
+	// 		5,
+	// 	}
+	// }
+
 	return m
+
 }
 
-func (this Stream) Create() int {
+func (this Hls) Create() int {
 	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds"
 
 	b := new(bytes.Buffer)
@@ -95,37 +114,7 @@ func (this Stream) Create() int {
 	return x.Id
 }
 
-func (this Stream) GlobalKey() string {
-	url := conf.Url + conf.AccountNumber + "/fmsliveauth/globalkey"
-
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", conf.Token)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Host", "api.edgecast.com")
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer res.Body.Close()
-
-	fmt.Println("GLOBAL KEY")
-
-	body, _ := ioutil.ReadAll(res.Body)
-	// fmt.Println("Response Body:", string(body))
-
-	x := new(resGkey)
-	err = json.Unmarshal(body, &x)
-	if err != nil {
-		panic(err)
-	}
-
-	return x.Id
-}
-
-func (this Stream) GetStream(s int) *Response {
+func (this Hls) GetStream(s int) *Response {
 	ss := strconv.Itoa(s)
 	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds/" + ss
 
@@ -159,7 +148,7 @@ func (this Stream) GetStream(s int) *Response {
 	x.HDSPlaybackUrl = hds
 	x.HLSPlaybackUrl = hls
 
-	evkey := x.EventName + "?" + this.GlobalKey() + "&"
+	evkey := x.EventName + "?" + settings.GlobalKey() + "&"
 
 	for k, elem := range x.PublishingPoints {
 		elem.Url = strings.Replace(elem.Url, "&lt;streamName&gt;?", evkey, 1)
