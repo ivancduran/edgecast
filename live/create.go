@@ -59,21 +59,22 @@ type resCreate struct {
 func New(s string) Stream {
 	fmt.Println(s)
 
-	m := Hls{
+	var m = Hls{
 		utils.Rands(15),
 		"2100-01-01",
 		"default",
 		10,
 	}
 
-	// if s == "smooth" {
-	// 	m := Smooth{
-	// 		utils.Rands(15),
-	// 		"2100-01-01",
-	// 		"default",
-	// 		5,
-	// 	}
-	// }
+	if s == "smooth" {
+		var m = Smooth{
+			utils.Rands(15),
+			"2100-01-01",
+			"default",
+			5,
+		}
+		return m
+	}
 
 	return m
 
@@ -157,4 +158,52 @@ func (this *Hls) GetStream(s int) *Response {
 
 	return x
 
+}
+
+func (this Smooth) Create() int {
+	return 0
+}
+
+func (this Smooth) GetStream(s int) *Response {
+	ss := strconv.Itoa(s)
+	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds/" + ss
+
+	fmt.Println(url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", conf.Token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Host", "api.edgecast.com")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer res.Body.Close()
+
+	body, _ := ioutil.ReadAll(res.Body)
+	// fmt.Println("Response Body:", string(body))
+
+	x := new(Response)
+	err = json.Unmarshal(body, &x)
+	if err != nil {
+		panic(err)
+	}
+
+	hls := strings.Replace(x.HLSPlaybackUrl, "&lt;streamName&gt;", x.EventName, 1)
+	hds := strings.Replace(x.HDSPlaybackUrl, "&lt;streamName&gt;", x.EventName, 1)
+
+	x.HDSPlaybackUrl = hds
+	x.HLSPlaybackUrl = hls
+
+	evkey := x.EventName + "?" + settings.GlobalKey() + "&"
+
+	for k, elem := range x.PublishingPoints {
+		elem.Url = strings.Replace(elem.Url, "&lt;streamName&gt;?", evkey, 1)
+		x.PublishingPoints[k].Url = elem.Url
+	}
+
+	return x
 }
