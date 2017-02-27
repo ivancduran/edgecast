@@ -13,7 +13,8 @@ func main() {
 	fmt.Println(id)
 
 	entry := stream.GetStream(id)
-	fmt.Println(entry.PublishingPoints[0].Url)
-	fmt.Println(entry.HLSPlaybackUrl)
+	fmt.Println(entry)
+	// fmt.Println(entry.HLSPlaybackUrl)
+	// settings.StreamKeys()
 
 }

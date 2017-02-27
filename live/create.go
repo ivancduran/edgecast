@@ -63,7 +63,7 @@ func New(s string) Stream {
 		utils.Rands(15),
 		"2100-01-01",
 		"default",
-		5,
+		10,
 	}
 
 	// if s == "smooth" {
@@ -79,7 +79,7 @@ func New(s string) Stream {
 
 }
 
-func (this Hls) Create() int {
+func (this *Hls) Create() int {
 	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds"
 
 	b := new(bytes.Buffer)
@@ -114,7 +114,7 @@ func (this Hls) Create() int {
 	return x.Id
 }
 
-func (this Hls) GetStream(s int) *Response {
+func (this *Hls) GetStream(s int) *Response {
 	ss := strconv.Itoa(s)
 	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds/" + ss
 
