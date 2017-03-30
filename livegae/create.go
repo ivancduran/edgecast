@@ -12,11 +12,14 @@ import (
 	"github.com/ivancduran/edgecast/conf"
 	"github.com/ivancduran/edgecast/settings"
 	"github.com/ivancduran/edgecast/utils"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/urlfetch"
 )
 
 type Stream interface {
-	Create() int
-	GetStream(s int) *Response
+	Create(r *http.Request) int
+	GetStream(s int, r *http.Request) *Response
 }
 
 type Hls struct {
@@ -79,7 +82,7 @@ func New(s string) Stream {
 
 }
 
-func (this Hls) Create() int {
+func (this Hls) Create(r *http.Request) int {
 	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds"
 
 	b := new(bytes.Buffer)
@@ -93,7 +96,14 @@ func (this Hls) Create() int {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Length", string(b.Len()))
 
-	client := &http.Client{}
+	// transport := http.Transport{}
+	// client := &http.Client{
+	// 	Transport: &transport,
+	// }
+
+	ctx := appengine.NewContext(r)
+	client := urlfetch.Client(ctx)
+	// client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
 		panic(err)
@@ -114,7 +124,7 @@ func (this Hls) Create() int {
 	return x.Id
 }
 
-func (this Hls) GetStream(s int) *Response {
+func (this Hls) GetStream(s int, r *http.Request) *Response {
 	ss := strconv.Itoa(s)
 	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds/" + ss
 
@@ -123,10 +133,20 @@ func (this Hls) GetStream(s int) *Response {
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", conf.Token)
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Host", "api.edgecast.com")
+	// req.Header.Set("Host", "api.edgecast.com")
 	req.Header.Set("Content-Type", "application/json")
 
+	// client := &http.Client{}
+	ctx := appengine.NewContext(r)
+	http.DefaultClient = &http.Client{Transport: &urlfetch.Transport{Context: ctx}}
+	http.DefaultTransport = &urlfetch.Transport{Context: ctx}
+	// client := urlfetch.Client(ctx)
 	client := &http.Client{}
+
+	// client := &http.Client{
+	// 	Transport: &urlfetch.Transport{Context: ctx},
+	// }
+
 	res, err := client.Do(req)
 	if err != nil {
 		panic(err)
@@ -159,11 +179,11 @@ func (this Hls) GetStream(s int) *Response {
 
 }
 
-func (this Smooth) Create() int {
+func (this Smooth) Create(r *http.Request) int {
 	return 0
 }
 
-func (this Smooth) GetStream(s int) *Response {
+func (this Smooth) GetStream(s int, r *http.Request) *Response {
 	ss := strconv.Itoa(s)
 	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds/" + ss
 
