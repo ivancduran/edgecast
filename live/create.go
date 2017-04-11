@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/ivancduran/edgecast/conf"
@@ -15,15 +14,14 @@ import (
 )
 
 type Stream interface {
-	Create() int
-	GetStream(s int) *Response
+	Create() *CreateResponse
 }
 
 type Hls struct {
-	EventName        string
-	Expiration       string
-	InstanceName     string
-	KeyFrameInterval int
+	// Encrypted    bool
+	InstanceName string
+	// DvrDuration  int
+	SegmentSize int
 }
 
 type Smooth struct {
@@ -31,6 +29,19 @@ type Smooth struct {
 	Expiration       string
 	InstanceName     string
 	KeyFrameInterval int
+}
+
+type CreateResponse struct {
+	Id           int
+	CustomerId   int
+	DvrDuration  int
+	Encrypted    bool
+	InstanceName string
+	PlaybackUrl  string
+	PublishUrl   string
+	HLS          string
+	DASH         string
+	SegmentSize  int
 }
 
 type Response struct {
@@ -59,9 +70,9 @@ type resCreate struct {
 func New(s string) Stream {
 
 	var m = Hls{
+		// false,
 		utils.Rands(15),
-		"2100-01-01",
-		"default",
+		// 0,
 		10,
 	}
 
@@ -79,12 +90,14 @@ func New(s string) Stream {
 
 }
 
-func (this Hls) Create() int {
-	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds"
+func (this Hls) Create() *CreateResponse {
+	url := conf.Url + conf.AccountNumber + "/httpstreaming/dcp/live"
 
 	b := new(bytes.Buffer)
 
 	json.NewEncoder(b).Encode(this)
+
+	fmt.Println(string(b.String()))
 
 	req, err := http.NewRequest("POST", url, b)
 	req.Header.Set("Authorization", conf.Token)
@@ -100,109 +113,32 @@ func (this Hls) Create() int {
 	}
 	defer res.Body.Close()
 
-	// fmt.Println("Response Status:", res.Status)
-	// fmt.Println("Response Headers:", res.Header)
 	body, _ := ioutil.ReadAll(res.Body)
-	// fmt.Println("Response Body:", string(body))
 
-	x := new(resCreate)
+	x := new(CreateResponse)
 	err = json.Unmarshal(body, &x)
+
 	if err != nil {
 		panic(err)
 	}
 
-	return x.Id
-}
+	playback := strings.Replace(x.PlaybackUrl, "<streamName>", x.InstanceName, 1)
 
-func (this Hls) GetStream(s int) *Response {
-	ss := strconv.Itoa(s)
-	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds/" + ss
+	x.PublishUrl = "rtmp://fso.dca.34C45.xicdn.net" + x.PublishUrl
 
-	fmt.Println(url)
+	publishName := strings.Replace(x.PublishUrl, "<streamName>", x.InstanceName, 1)
+	x.PublishUrl = publishName
+	publishLive := strings.Replace(x.PublishUrl, "<Live Authentication Key>", settings.GlobalKey(), 1)
+	x.PublishUrl = publishLive
 
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", conf.Token)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Host", "api.edgecast.com")
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer res.Body.Close()
-
-	body, _ := ioutil.ReadAll(res.Body)
-	// fmt.Println("Response Body:", string(body))
-
-	x := new(Response)
-	err = json.Unmarshal(body, &x)
-	if err != nil {
-		panic(err)
-	}
-
-	hls := strings.Replace(x.HLSPlaybackUrl, "&lt;streamName&gt;", x.EventName, 1)
-	hds := strings.Replace(x.HDSPlaybackUrl, "&lt;streamName&gt;", x.EventName, 1)
-
-	x.HDSPlaybackUrl = hds
-	x.HLSPlaybackUrl = hls
-
-	evkey := x.EventName + "?" + settings.GlobalKey() + "&"
-
-	for k, elem := range x.PublishingPoints {
-		elem.Url = strings.Replace(elem.Url, "&lt;streamName&gt;?", evkey, 1)
-		x.PublishingPoints[k].Url = elem.Url
-	}
+	x.PlaybackUrl = playback
+	x.HLS = playback + ".m3u8"
+	x.DASH = playback + ".mpd"
 
 	return x
-
 }
 
-func (this Smooth) Create() int {
-	return 0
-}
-
-func (this Smooth) GetStream(s int) *Response {
-	ss := strconv.Itoa(s)
-	url := conf.Url + conf.AccountNumber + "/httpstreaming/livehlshds/" + ss
-
-	fmt.Println(url)
-
-	req, err := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", conf.Token)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Host", "api.edgecast.com")
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer res.Body.Close()
-
-	body, _ := ioutil.ReadAll(res.Body)
-	// fmt.Println("Response Body:", string(body))
-
-	x := new(Response)
-	err = json.Unmarshal(body, &x)
-	if err != nil {
-		panic(err)
-	}
-
-	hls := strings.Replace(x.HLSPlaybackUrl, "&lt;streamName&gt;", x.EventName, 1)
-	hds := strings.Replace(x.HDSPlaybackUrl, "&lt;streamName&gt;", x.EventName, 1)
-
-	x.HDSPlaybackUrl = hds
-	x.HLSPlaybackUrl = hls
-
-	evkey := x.EventName + "?" + settings.GlobalKey() + "&"
-
-	for k, elem := range x.PublishingPoints {
-		elem.Url = strings.Replace(elem.Url, "&lt;streamName&gt;?", evkey, 1)
-		x.PublishingPoints[k].Url = elem.Url
-	}
-
-	return x
+func (this Smooth) Create() *CreateResponse {
+	x := CreateResponse{}
+	return &x
 }

@@ -29,8 +29,6 @@ func GlobalKey() string {
 	}
 	defer res.Body.Close()
 
-	fmt.Println("GLOBAL KEY")
-
 	body, _ := ioutil.ReadAll(res.Body)
 	// fmt.Println("Response Body:", string(body))
 
